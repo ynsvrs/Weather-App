@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -54,6 +55,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx.v280)
     implementation(libs.androidx.activity.compose.v190)
 
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.database)
+
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom.v20240500))
     implementation(libs.androidx.ui)
@@ -69,7 +74,7 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // Retrofit for networking (includes Gson automatically!)
+    // Retrofit for networking
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     implementation(libs.okhttp)
