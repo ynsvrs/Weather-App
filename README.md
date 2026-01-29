@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A modern Android weather application built with **Kotlin** and **Jetpack Compose** that provides real-time weather information, forecasts, and offline support. The app demonstrates professional Android development practices including MVVM architecture, repository pattern, and modern Compose UI.
+A modern Android weather application built with **Kotlin** and **Jetpack Compose** that provides real-time weather information, forecasts, and offline support. The app demonstrates professional Android development practices including MVVM architecture, repository pattern, and modern Compose UI. Extended with Firebase Realtime Database integration, adding a Favorites and Notes feature with real-time synchronization across devices.
 
 ## 🌐 API Information
 
@@ -108,7 +108,165 @@ GET https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278
 }
 ```
 ---
+# Firebase Setup Steps
 
+## Step 1: Create Firebase Project
+- Created new project: WeatherApp
+- Added Android app with package: com.yourname.weatherapp
+
+## Step 2: Download Configuration
+
+- Downloaded google-services.json
+- Placed in app/ directory
+- Added to .gitignore to prevent committing secrets
+
+## Step 3: Update Gradle Files
+- Project-level build.gradle.kts
+- Module-level app/build.gradle.kts
+
+## Step 4: Enable Firebase Services
+
+- Authentication: Enabled Anonymous Auth
+- Realtime Database: Created database in us-central1
+- Security Rules: Configured 
+---
+
+# Authentification
+## User Flow:
+
+- App launches
+- Checks if user is authenticated
+- If not, automatically signs in anonymously
+- UID is used for data scoping
+
+# Real-Time Synchronization
+
+### How It Works
+- Technology: Firebase Realtime Database ValueEventListener
+
+### Behavior:
+
+- Initial Load: Listener fires immediately with current data
+- On Change: Fires whenever data at that path changes
+- Child Events: Detects add, modify, remove operations
+- Automatic: No manual refresh needed
+
+## Real-Time Features
+### Multi-Device Sync:
+
+- Changes on Device A appear on Device B instantly
+- Works across emulators/physical devices
+- No polling required
+
+### Instant UI Updates:
+
+- StateFlow emits new list
+- Compose recomposes automatically
+- Smooth animations
+
+### Offline Support:
+
+- Firebase caches data locally
+- Works offline (reads cached data)
+- Syncs changes when back online
+
+# Security Rules
+## Configured Rules
+
+```bash
+json{
+"rules": {
+"favorites": {
+"$uid": {
+".read": "$uid === auth.uid",
+".write": "$uid === auth.uid",
+"$favoriteId": {
+".validate": "newData.hasChildren(['id', 'cityName', 'country', 'createdAt', 'createdBy'])",
+"id": {
+".validate": "newData.isString()"
+},
+"cityName": {
+".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+},
+"country": {
+".validate": "newData.isString()"
+},
+"latitude": {
+".validate": "newData.isNumber()"
+},
+"longitude": {
+".validate": "newData.isNumber()"
+},
+"note": {
+".validate": "newData.isString() && newData.val().length <= 500"
+},
+"createdAt": {
+".validate": "newData.isNumber()"
+},
+"createdBy": {
+".validate": "newData.val() === auth.uid"
+},
+"updatedAt": {
+".validate": "newData.isNumber()"
+}
+}
+}
+}
+}
+}
+```
+
+## Rule Explanation
+### 1. Read Access
+```bash
+   json".read": "$uid === auth.uid"
+```
+- Purpose: Users can only read their own favorites
+- Security: Prevents users from seeing other users' data
+- Test: Try accessing /favorites/other_uid → Denied
+### 2. Write Access
+```bash
+json".write": "$uid === auth.uid"
+```
+- Purpose: Users can only write to their own node
+- Security: Prevents malicious users from modifying others' data
+- Test: Try writing to /favorites/other_uid → Denied
+### 3. Required Fields Validation
+```bash
+   json".validate": "newData.hasChildren(['id', 'cityName', 'country', 'createdAt', 'createdBy'])"
+```
+- Purpose: Ensures complete data structure
+- Security: Prevents incomplete/malformed records
+- Test: Try adding favorite without cityName → Rejected
+### 4. Field-Level Constraints
+   City Name Length:
+```bash
+   json"cityName": {
+   ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+   }
+```
+- Prevents empty names
+- Limits to 100 characters
+- Prevents database bloat
+
+Note Length:
+```bash
+json"note": {
+".validate": "newData.isString() && newData.val().length <= 500"
+}
+```
+- Prevents excessively long notes
+- 500 char limit is reasonable for notes
+
+CreatedBy Validation:
+```bash
+json"createdBy": {
+".validate": "newData.val() === auth.uid"
+}
+```
+- Must match authenticated user
+- Prevents impersonation
+- Ensures data ownership
 ### Each File Responsibilities
 
 #### **1. Presentation (UI)**
