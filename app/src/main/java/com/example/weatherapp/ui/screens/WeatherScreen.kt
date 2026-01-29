@@ -16,25 +16,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.weatherapp.data.model.FavoriteCity
 import com.example.weatherapp.data.model.GeoLocation
 import com.example.weatherapp.ui.components.*
+import com.example.weatherapp.viewmodel.FavoritesViewModel
 import com.example.weatherapp.viewmodel.SearchUiState
 import com.example.weatherapp.viewmodel.WeatherUiState
 import com.example.weatherapp.viewmodel.WeatherViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeatherScreen(
     viewModel: WeatherViewModel,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToFavorites: () -> Unit
 ) {
     val weatherUiState by viewModel.weatherUiState.collectAsStateWithLifecycle()
     val searchUiState by viewModel.searchUiState.collectAsStateWithLifecycle()
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
     val temperatureUnit by viewModel.temperatureUnit.collectAsStateWithLifecycle()
 
+    val favoritesViewModel: FavoritesViewModel = viewModel()
+    val scope = rememberCoroutineScope()
+
     var searchQuery by remember { mutableStateOf("") }
     var showSearchDialog by remember { mutableStateOf(false) }
+    var showAddNoteDialog by remember { mutableStateOf(false) }
+    var currentLocation by remember { mutableStateOf<GeoLocation?>(null) }
 
     val temperatureSymbol = viewModel.getTemperatureSymbol()
 
@@ -43,6 +53,9 @@ fun WeatherScreen(
             TopAppBar(
                 title = { Text("Weather App") },
                 actions = {
+                    IconButton(onClick = onNavigateToFavorites) {
+                        Icon(Icons.Default.Star, contentDescription = "Favorites")
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -84,6 +97,19 @@ fun WeatherScreen(
                         temperatureSymbol = temperatureSymbol,
                         onRefresh = {
                             viewModel.searchCity(state.weatherData.cityName)
+                        },
+                        onAddToFavorites = {
+                            // Store location for adding to favorites
+                            scope.launch {
+                                val location = GeoLocation(
+                                    name = state.weatherData.cityName,
+                                    latitude = 0.0, // We don't store this, will search again
+                                    longitude = 0.0,
+                                    country = state.weatherData.country
+                                )
+                                currentLocation = location
+                                showAddNoteDialog = true
+                            }
                         }
                     )
                 }
@@ -114,6 +140,7 @@ fun WeatherScreen(
             },
             searchUiState = searchUiState,
             onLocationClick = { location ->
+                currentLocation = location
                 viewModel.getWeather(location)
                 showSearchDialog = false
                 searchQuery = ""
@@ -122,6 +149,31 @@ fun WeatherScreen(
             onHistoryClick = { city ->
                 searchQuery = city
                 viewModel.searchCity(city)
+            }
+        )
+    }
+
+    // Add to Favorites Dialog
+    if (showAddNoteDialog && currentLocation != null) {
+        AddToFavoritesDialog(
+            cityName = currentLocation!!.name,
+            onDismiss = {
+                showAddNoteDialog = false
+                currentLocation = null
+            },
+            onAdd = { note ->
+                scope.launch {
+                    val favorite = FavoriteCity(
+                        cityName = currentLocation!!.name,
+                        country = currentLocation!!.country,
+                        latitude = currentLocation!!.latitude,
+                        longitude = currentLocation!!.longitude,
+                        note = note
+                    )
+                    favoritesViewModel.addFavorite(favorite)
+                    showAddNoteDialog = false
+                    currentLocation = null
+                }
             }
         )
     }
@@ -195,7 +247,8 @@ fun InitialScreen(
 fun WeatherContent(
     weatherData: com.example.weatherapp.data.model.WeatherData,
     temperatureSymbol: String,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onAddToFavorites: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -213,6 +266,16 @@ fun WeatherContent(
             isOffline = weatherData.isOffline,
             temperatureSymbol = temperatureSymbol
         )
+
+        // Add to Favorites Button
+        Button(
+            onClick = onAddToFavorites,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Star, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Add to Favorites")
+        }
 
         // Weather details
         Card(
@@ -331,7 +394,7 @@ fun WeatherContent(
 
         // Refresh button
         if (!weatherData.isOffline) {
-            Button(
+            OutlinedButton(
                 onClick = onRefresh,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -426,6 +489,44 @@ fun SearchDialog(
         confirmButton = {
             TextButton(onClick = onSearch) {
                 Text("Search")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun AddToFavoritesDialog(
+    cityName: String,
+    onDismiss: () -> Unit,
+    onAdd: (String) -> Unit
+) {
+    var note by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add to Favorites") },
+        text = {
+            Column {
+                Text("Add $cityName to your favorites?")
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Note (optional)") },
+                    placeholder = { Text("e.g., Best in summer, Bring umbrella") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onAdd(note) }) {
+                Text("Add")
             }
         },
         dismissButton = {

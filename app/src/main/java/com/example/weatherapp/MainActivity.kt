@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.weatherapp.ui.screens.FavoritesScreen
 import com.example.weatherapp.ui.screens.SettingsScreen
 import com.example.weatherapp.ui.screens.WeatherScreen
 import com.example.weatherapp.ui.theme.WeatherAppTheme
@@ -49,6 +50,9 @@ fun WeatherApp() {
                 viewModel = viewModel,
                 onNavigateToSettings = {
                     navController.navigate("settings")
+                },
+                onNavigateToFavorites = {
+                    navController.navigate("favorites")
                 }
             )
         }
@@ -57,6 +61,19 @@ fun WeatherApp() {
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable("favorites") {
+            FavoritesScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onCityClick = { cityName ->
+                    // Search for this city and go back to weather screen
+                    viewModel.searchCity(cityName)
                     navController.popBackStack()
                 }
             )
